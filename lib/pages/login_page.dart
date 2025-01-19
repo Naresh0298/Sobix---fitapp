@@ -40,7 +40,7 @@ class _LoginPageState extends State<LoginPage> {
     } on FirebaseAuthException catch (e) {
       Navigator.pop(context);
 
-      print("errorcode $e.code");
+      //print("errorcode $e.code");
       if (e.code == 'invalid-credential') {
         wrongEmailMessage(e.code);
       }
@@ -132,17 +132,17 @@ class _LoginPageState extends State<LoginPage> {
               //sign in button
 
               MyButton(
-                //s
-                onTap: () {
-                  if (isValidEmail(emailController.text)) {
-                    // signUserIn();
-                    print("emailvalid true");
-                  } else {
-                    print("emailvalid false");
-                  }
-                },
-                //e
-                // onTap: signUserIn,
+                // //s
+                // onTap: () {
+                //   if (isValidEmail(emailController.text)) {
+                //     // signUserIn();
+                //     print("emailvalid true");
+                //   } else {
+                //     print("emailvalid false");
+                //   }
+                // },
+                // //e
+                onTap: signUserIn,
               ),
 
               const SizedBox(
