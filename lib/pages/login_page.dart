@@ -71,7 +71,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
               //logo
               const Icon(
-                Icons.lock,
+                Icons.fitness_center_outlined,
                 size: 100,
               ),
 
@@ -189,7 +189,7 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(
                     width: 10,
                   ),
-                  SquareTile(imgPath: 'lib/images/google.png'),
+                  SquareTile(imgPath: 'lib/images/apple-logo.png'),
                 ],
               ),
               const SizedBox(

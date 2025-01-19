@@ -17,6 +17,7 @@ class HomePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text('DashBoard'),
+        actions: [IconButton(onPressed: signUserOut, icon: Icon(Icons.logout))],
       ),
       body: SafeArea(
           child: Padding(
