@@ -1,11 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fitapp/database_services/firestore_CRUD.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class ExerciseDetailsUpdatePage extends StatefulWidget {
-  final int day;
+  final String date;
 
-  const ExerciseDetailsUpdatePage({super.key, required this.day});
+  const ExerciseDetailsUpdatePage({super.key, required this.date});
 
   @override
   State<ExerciseDetailsUpdatePage> createState() =>
@@ -17,90 +18,149 @@ class _ExerciseDetailsUpdatePageState extends State<ExerciseDetailsUpdatePage> {
 
   final FirestoreService firestoreService = FirestoreService();
 
-  //open a dailog box to add a note
-  void openNoteBox({String? docID}) {
-    showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-              content: TextField(
-                controller: textEditingController,
-              ),
-              actions: [
-                //button to save
-                ElevatedButton(
-                    onPressed: () {
-                      if (docID == null) {
-                        firestoreService.addNote(textEditingController.text);
-                      } else {
-                        firestoreService.UpdateNote(
-                            docID, textEditingController.text);
-                      }
+// Open a dialog box to add or update a note
+  void openNoteBox(
+      {String? docID,
+      String? currentExerciseName,
+      int? currentSets,
+      int? currentReps,
+      double? currentWeight}) {
+    textEditingController.text = currentExerciseName ?? '';
 
-                      //clear text controller
-                      textEditingController.clear();
-                      Navigator.pop(context);
-                    },
-                    child: Text('Add'))
-              ],
-            ));
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: textEditingController,
+              decoration: InputDecoration(hintText: "Exercise Name"),
+            ),
+            TextField(
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(hintText: "Sets"),
+              onChanged: (value) {
+                currentSets = int.tryParse(value);
+              },
+            ),
+            TextField(
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(hintText: "Reps"),
+              onChanged: (value) {
+                currentReps = int.tryParse(value);
+              },
+            ),
+            TextField(
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(hintText: "Weight (kg)"),
+              onChanged: (value) {
+                currentWeight = double.tryParse(value);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              if (docID == null) {
+                // Add new note for the day
+                firestoreService.addExerciseLog(
+                  widget.date,
+                  textEditingController.text,
+                  currentSets ?? 0,
+                  currentReps ?? 0,
+                  currentWeight ?? 0.0,
+                );
+              } else {
+                // Update existing note
+                firestoreService.updateExerciseLog(
+                  widget.date,
+                  docID,
+                  textEditingController.text,
+                  currentSets ?? 0,
+                  currentReps ?? 0,
+                  currentWeight ?? 0.0,
+                );
+              }
+
+              // Clear the text controller and close the dialog
+              textEditingController.clear();
+              Navigator.pop(context);
+            },
+            child: Text(docID == null ? 'Add' : 'Update'),
+          )
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Day ${widget.day}")),
+      appBar: AppBar(title: Text("Day ${widget.date}")),
       floatingActionButton: FloatingActionButton(
         onPressed: openNoteBox,
         child: const Icon(Icons.add),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: firestoreService.getNoteStream(),
+        stream: firestoreService.getNotesForDateStream(widget.date),
         builder: (context, snapshot) {
           if (snapshot.hasData) {
             List notesList = snapshot.data!.docs;
 
             return ListView.builder(
-                itemCount: notesList.length,
-                itemBuilder: (context, index) {
-                  DocumentSnapshot document = notesList[index];
+              itemCount: notesList.length,
+              itemBuilder: (context, index) {
+                DocumentSnapshot document = notesList[index];
 
-                  String docID = document.id;
+                String docID = document.id;
+                Map<String, dynamic> data =
+                    document.data() as Map<String, dynamic>;
 
-                  //get note from each doc
-                  Map<String, dynamic> data =
-                      document.data() as Map<String, dynamic>;
-                  String noteText = data['Ex-name'];
+                // Extract exercise log data
+                String exerciseName =
+                    data['exercise-name'] ?? 'No exercise name';
+                int sets = data['sets'] ?? 0;
+                int reps = data['reps'] ?? 0;
+                double weight = data['weight'] ?? 0.0;
 
-                  return ListTile(
-                    title: Text(noteText),
-                    trailing: SizedBox(
-                      width: 100, // Limit the width of the trailing widget
-                      child: Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.end, // Align buttons to the end
-                        children: [
-                          // Update button
-                          IconButton(
-                            onPressed: () {
-                              openNoteBox(docID: docID);
-                            },
-                            icon: const Icon(Icons.settings),
-                          ),
-
-                          // Delete button
-                          IconButton(
-                            onPressed: () {
-                              firestoreService.DeleteNote(docID);
-                            },
-                            icon: const Icon(Icons.delete),
-                          ),
-                        ],
-                      ),
+                return ListTile(
+                  title: Text(exerciseName),
+                  subtitle:
+                      Text('Sets: $sets, Reps: $reps, Weight: $weight kg'),
+                  trailing: SizedBox(
+                    width: 100,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        IconButton(
+                          onPressed: () {
+                            openNoteBox(
+                              docID: docID,
+                              currentExerciseName: exerciseName,
+                              currentSets: sets,
+                              currentReps: reps,
+                              currentWeight: weight,
+                            );
+                          },
+                          icon: const Icon(Icons.settings),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            firestoreService.deleteExerciseLog(
+                                widget.date, docID);
+                          },
+                          icon: const Icon(Icons.delete),
+                        ),
+                      ],
                     ),
-                  );
-                });
+                  ),
+                );
+              },
+            );
           } else {
-            return Text("Note notes..");
+            return Center(child: Text("No exercise logs available."));
           }
         },
       ),
