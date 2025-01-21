@@ -42,9 +42,8 @@ class MyListViewPanel extends StatelessWidget {
     var totalLiftRef = FirebaseFirestore.instance
         .collection('users')
         .doc(userId)
-        .collection('entries')
-        .doc(date)
-        .collection('total-lift-log');
+        .collection('daily-progress')
+        .where('date', isEqualTo: date); // Filter by date
 
     var snapshot = await totalLiftRef.get();
 
@@ -52,10 +51,8 @@ class MyListViewPanel extends StatelessWidget {
     int prCount = 0;
 
     for (var doc in snapshot.docs) {
-      totalLift += doc['total-weight'] ?? 0.0;
-      if (doc['PR'] == 'YES') {
-        prCount++;
-      }
+      totalLift += doc['total-lift'] ?? 0.0;
+      prCount = doc['PR'] ?? 0;
     }
 
     return {

@@ -5,7 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'dart:async'; // Import StreamController
+import 'dart:async';
 
 class HomePage extends StatefulWidget {
   HomePage({super.key});
@@ -17,17 +17,40 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   bool showAvg = false;
   final user = FirebaseAuth.instance.currentUser!;
-  bool isLoading = false; // Flag to track loading state
-
-  // StreamController to manually control the stream
+  bool isLoading = false;
+  int todaysPR = 0;
   final StreamController<List<Map<String, dynamic>>> _streamController =
       StreamController<List<Map<String, dynamic>>>();
+
+  Future<int> fetchTodaysPR() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      throw Exception("User not logged in");
+    }
+
+    String today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    var snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('daily-progress')
+        .where('date', isEqualTo: today)
+        .get();
+
+    int prCount = 0;
+
+    // Sum up all the PR values from today's documents
+    for (var doc in snapshot.docs) {
+      prCount += (doc.data()['PR'] as int?) ?? 0; // Use 0 if 'PR' is null
+    }
+
+    return prCount;
+  }
 
   void signUserOut() {
     FirebaseAuth.instance.signOut();
   }
 
-  // Fetch daily progress data
   Stream<List<Map<String, dynamic>>> getDailyProgress() {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     return FirebaseFirestore.instance
@@ -47,17 +70,18 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  // Custom Title Widgets for X-axis (Dates)
   Widget bottomTitleWidgets(double value, TitleMeta meta) {
     const style = TextStyle(fontWeight: FontWeight.bold, fontSize: 12);
-    Widget text;
-    var date = DateFormat('MM/dd')
-        .format(DateTime.fromMillisecondsSinceEpoch(value.toInt()));
-    text = Text(date, style: style);
-    return SideTitleWidget(meta: meta, child: text);
+    String date;
+    try {
+      date = DateFormat('MM/dd')
+          .format(DateTime.fromMillisecondsSinceEpoch(value.toInt()));
+    } catch (_) {
+      date = '';
+    }
+    return SideTitleWidget(meta: meta, child: Text(date, style: style));
   }
 
-  // Custom Title Widgets for Y-axis (Total Lift)
   Widget leftTitleWidgets(double value, TitleMeta meta) {
     const style = TextStyle(fontWeight: FontWeight.bold, fontSize: 12);
     String text = value.toInt().toString();
@@ -105,7 +129,7 @@ class _HomePageState extends State<HomePage> {
         LineChartBarData(
           spots: spots,
           isCurved: true,
-          color: Colors.blue, // Gradient color
+          color: Colors.blue,
           barWidth: 4,
           isStrokeCapRound: true,
           belowBarData: BarAreaData(show: true, color: Colors.green),
@@ -114,9 +138,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Method to trigger refresh of data
   void refreshData() {
-    // Fetch the latest data and add it to the stream
     setState(() {
       isLoading = true;
     });
@@ -137,7 +159,7 @@ class _HomePageState extends State<HomePage> {
         };
       }).toList();
 
-      _streamController.sink.add(updatedData); // Add data to stream
+      _streamController.sink.add(updatedData);
       setState(() {
         isLoading = false;
       });
@@ -146,8 +168,20 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
-    _streamController.close(); // Don't forget to close the stream
+    _streamController.close();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch today's PR when the widget is initialized
+    fetchTodaysPR().then((prCount) {
+      setState(() {
+        print("prCount: $prCount"); // Debug log
+        todaysPR = prCount; // Update the PR value
+      });
+    });
   }
 
   @override
@@ -173,11 +207,10 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     MyPanel(title: 'PG%', value: "60", color: Colors.green),
                     MyPanel(title: 'Weight', value: "74kg", color: Colors.blue),
-                    MyPanel(title: 'PR', value: "2", color: Colors.red),
+                    MyPanel(title: 'PR', value: "$todaysPR", color: Colors.red),
                   ],
                 ),
                 SizedBox(height: 25),
-                // Refresh button
                 ElevatedButton(
                   onPressed: refreshData,
                   child: Text('Refresh Data'),
@@ -185,9 +218,9 @@ class _HomePageState extends State<HomePage> {
                 SizedBox(height: 25),
                 Expanded(
                   child: StreamBuilder<List<Map<String, dynamic>>>(
-                    stream: _streamController.stream.isEmpty
-                        ? getDailyProgress() // Use default stream if no refresh
-                        : _streamController.stream, // Use custom stream
+                    stream: _streamController.hasListener
+                        ? _streamController.stream
+                        : getDailyProgress(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting ||
                           isLoading) {
@@ -207,26 +240,6 @@ class _HomePageState extends State<HomePage> {
                               padding: const EdgeInsets.only(
                                   right: 18, left: 12, top: 24, bottom: 12),
                               child: LineChart(mainData(dailyProgress)),
-                            ),
-                          ),
-                          SizedBox(
-                            width: 60,
-                            height: 34,
-                            child: TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  showAvg = !showAvg;
-                                });
-                              },
-                              child: Text(
-                                'avg',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: showAvg
-                                      ? Colors.white.withOpacity(0.5)
-                                      : Colors.white,
-                                ),
-                              ),
                             ),
                           ),
                         ],
