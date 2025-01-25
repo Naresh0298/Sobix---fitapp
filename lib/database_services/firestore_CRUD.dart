@@ -60,8 +60,8 @@ class FirestoreService {
   }
 
   // CREATE: Add a new exercise log, update the total lift for the day (past or present), and update active dates
-  Future<void> addExerciseLog(String date, String exerciseName, int sets,
-      int reps, double weight) async {
+  Future<void> addExerciseLog(String date, String exerciseName,
+      List<Map<String, dynamic>> setDetails) async {
     _checkUserLoggedIn();
 
     // Get references to the collections
@@ -69,12 +69,18 @@ class FirestoreService {
     var notesTotalLift = getNotesForTotalLiftLog(date);
     var activeDatesRef = getActiveDates();
 
+    //Calculate total lift for the provided sets
+    double totalLift = 0.0;
+    for (var set in setDetails) {
+      int reps = set['reps'] ?? 0;
+      double weight = set['weight'] ?? 0.0;
+      totalLift += weight * reps;
+    }
+
     // Add exercise log
     await notesExercise.add({
       'exercise-name': exerciseName,
-      'sets': sets,
-      'reps': reps,
-      'weight': weight,
+      'sets': setDetails,
       'timestamp': FieldValue.serverTimestamp(),
     });
 
@@ -101,6 +107,7 @@ class FirestoreService {
       // If no entry exists, create a new one
       await dailyProgressRef.add({
         'total-lift': totalLift,
+        'PR': 0,
         'date': date,
         'timestamp': FieldValue.serverTimestamp(),
       });
@@ -108,6 +115,7 @@ class FirestoreService {
       // If an entry exists, update it
       await dailyProgressDoc.docs.first.reference.update({
         'total-lift': totalLift,
+        'PR': 0,
         'timestamp': FieldValue.serverTimestamp(),
       });
     }
@@ -156,6 +164,7 @@ class FirestoreService {
         return {
           'date': data['date'],
           'total-lift': data['total-lift'] ?? 0,
+          'PR': data['PR'] ?? 0,
         };
       }).toList();
     });

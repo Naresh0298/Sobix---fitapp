@@ -18,78 +18,99 @@ class _ExerciseDetailsUpdatePageState extends State<ExerciseDetailsUpdatePage> {
 
   final FirestoreService firestoreService = FirestoreService();
 
-// Open a dialog box to add or update a note
-  void openNoteBox(
-      {String? docID,
-      String? currentExerciseName,
-      int? currentSets,
-      int? currentReps,
-      double? currentWeight}) {
-    textEditingController.text = currentExerciseName ?? '';
+  final TextEditingController exerciseNameController = TextEditingController();
 
+  //to Store weight and reps for each set
+  int numberOfSets = 1;
+  List<Map<String, dynamic>> setsDetails = [];
+
+// Open a dialog box to add or update a note
+  void openAddExerciseDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        title: const Text('Add Exercise'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
-              controller: textEditingController,
-              decoration: InputDecoration(hintText: "Exercise Name"),
+              controller: exerciseNameController,
+              decoration: const InputDecoration(hintText: "Exercise Name"),
             ),
             TextField(
               keyboardType: TextInputType.number,
-              decoration: InputDecoration(hintText: "Sets"),
+              decoration: const InputDecoration(hintText: "Number of Sets"),
               onChanged: (value) {
-                currentSets = int.tryParse(value);
-              },
-            ),
-            TextField(
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(hintText: "Reps"),
-              onChanged: (value) {
-                currentReps = int.tryParse(value);
-              },
-            ),
-            TextField(
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(hintText: "Weight (kg)"),
-              onChanged: (value) {
-                currentWeight = double.tryParse(value);
+                numberOfSets = int.tryParse(value) ?? numberOfSets;
               },
             ),
           ],
         ),
         actions: [
           ElevatedButton(
-            onPressed: () {
-              if (docID == null) {
-                // Add new note for the day
-                firestoreService.addExerciseLog(
-                  widget.date,
-                  textEditingController.text,
-                  currentSets ?? 0,
-                  currentReps ?? 0,
-                  currentWeight ?? 0.0,
+              onPressed: () {
+                setsDetails = List.generate(
+                  numberOfSets,
+                  (_) => {"weight": 0.0, 'reps': 0},
                 );
-              } else {
-                // Update existing note
-                firestoreService.updateExerciseLog(
-                  widget.date,
-                  docID,
-                  textEditingController.text,
-                  currentSets ?? 0,
-                  currentReps ?? 0,
-                  currentWeight ?? 0.0,
-                );
-              }
+                Navigator.pop(context);
+                openSetDetailsDialog();
+              },
+              child: const Text("Next")),
+        ],
+      ),
+    );
+  }
 
-              // Clear the text controller and close the dialog
-              textEditingController.clear();
+  void openSetDetailsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Set Details for ${exerciseNameController.text}"),
+        content: SizedBox(
+          height: 300, // Set a fixed height for the dialog content
+          width: double.maxFinite, // Allow the dialog to expand horizontally
+          child: ListView.builder(
+            itemCount: numberOfSets,
+            itemBuilder: (context, index) {
+              return Column(
+                children: [
+                  Text("Set ${index + 1}"),
+                  TextField(
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(hintText: "Weight (kg)"),
+                    onChanged: (value) {
+                      setsDetails[index]["weight"] =
+                          double.tryParse(value) ?? 0.0;
+                    },
+                  ),
+                  TextField(
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(hintText: "Reps"),
+                    onChanged: (value) {
+                      setsDetails[index]["reps"] = int.tryParse(value) ?? 0;
+                    },
+                  ),
+                  const SizedBox(height: 10), // Add spacing between inputs
+                ],
+              );
+            },
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              firestoreService.addExerciseLog(
+                widget.date,
+                exerciseNameController.text,
+                setsDetails,
+              );
+              exerciseNameController.clear();
+              setsDetails.clear();
               Navigator.pop(context);
             },
-            child: Text(docID == null ? 'Add' : 'Update'),
-          )
+            child: const Text("Add"),
+          ),
         ],
       ),
     );
@@ -100,7 +121,7 @@ class _ExerciseDetailsUpdatePageState extends State<ExerciseDetailsUpdatePage> {
     return Scaffold(
       appBar: AppBar(title: Text("Day ${widget.date}")),
       floatingActionButton: FloatingActionButton(
-        onPressed: openNoteBox,
+        onPressed: openAddExerciseDialog,
         child: const Icon(Icons.add),
       ),
       body: StreamBuilder<QuerySnapshot>(
@@ -121,46 +142,49 @@ class _ExerciseDetailsUpdatePageState extends State<ExerciseDetailsUpdatePage> {
                 // Extract exercise log data
                 String exerciseName =
                     data['exercise-name'] ?? 'No exercise name';
-                int sets = data['sets'] ?? 0;
-                int reps = data['reps'] ?? 0;
-                double weight = data['weight'] ?? 0.0;
+                List<dynamic> setsDetails = data['sets'] ?? [];
 
-                return ListTile(
-                  title: Text(exerciseName),
-                  subtitle:
-                      Text('Sets: $sets, Reps: $reps, Weight: $weight kg'),
-                  trailing: SizedBox(
-                    width: 100,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        IconButton(
-                          onPressed: () {
-                            openNoteBox(
-                              docID: docID,
-                              currentExerciseName: exerciseName,
-                              currentSets: sets,
-                              currentReps: reps,
-                              currentWeight: weight,
-                            );
-                          },
-                          icon: const Icon(Icons.settings),
-                        ),
-                        IconButton(
-                          onPressed: () {
-                            firestoreService.deleteExerciseLog(
-                                widget.date, docID);
-                          },
-                          icon: const Icon(Icons.delete),
-                        ),
-                      ],
+                return Card(
+                  child: ListTile(
+                    title: Text(exerciseName),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children:
+                          setsDetails.asMap().entries.map<Widget>((entry) {
+                        int index = entry.key; // Correctly access the index
+                        Map<String, dynamic> set = entry.value; // Set details
+                        return Text(
+                          'Set ${index + 1}: Weight ${set["weight"]} kg, Reps: ${set["reps"]}',
+                        );
+                      }).toList(),
+                    ),
+                    trailing: SizedBox(
+                      width: 100,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          IconButton(
+                            onPressed: () {
+                              // Add logic for editing the card
+                            },
+                            icon: const Icon(Icons.settings),
+                          ),
+                          IconButton(
+                            onPressed: () {
+                              firestoreService.deleteExerciseLog(
+                                  widget.date, docID);
+                            },
+                            icon: const Icon(Icons.delete),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
               },
             );
           } else {
-            return Center(child: Text("No exercise logs available."));
+            return const Center(child: Text("No exercise logs available."));
           }
         },
       ),
