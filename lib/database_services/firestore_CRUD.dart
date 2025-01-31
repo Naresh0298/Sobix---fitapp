@@ -129,11 +129,16 @@ class FirestoreService {
     var exercises = await getNotesForExerciseLog(date).get();
 
     double totalLift = 0.0;
+
     for (var doc in exercises.docs) {
-      totalLift += updateTotalLift(doc['sets'], doc['reps'], doc['weight']);
+      List<dynamic> sets = doc['sets'];
+      for (var set in sets) {
+        double weight = (set['weight'] as num?)?.toDouble() ?? 0.0;
+        int reps = (set['reps'] as num?)?.toInt() ?? 0;
+        totalLift += weight * reps;
+      }
     }
 
-    // Now update or add total lift to the daily-progress collection
     await addDailyProgress(date, totalLift);
   }
 
