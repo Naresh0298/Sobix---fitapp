@@ -331,20 +331,51 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Dashboard'),
-        actions: [IconButton(onPressed: signUserOut, icon: Icon(Icons.logout))],
-      ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.symmetric(horizontal: 25.0, vertical: 25),
           child: Center(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Your Progress',
-                    style:
-                        TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    CircleAvatar(
+                      backgroundImage: NetworkImage(""),
+                      radius: 35,
+                    ),
+                    //logout icon
+                    IconButton(
+                      icon: Container(
+                          padding: EdgeInsets.all(15),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.grey,
+                          ),
+                          child: Icon(
+                            Icons.logout,
+                            size: 35,
+                          )),
+                      onPressed: signUserOut,
+                    )
+                  ],
+                ),
+
+                SizedBox(
+                  height: 25,
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Activity',
+                        style: TextStyle(
+                            fontSize: 40, fontWeight: FontWeight.bold)),
+                    Text('Summary',
+                        style: TextStyle(
+                            fontSize: 40, fontWeight: FontWeight.bold)),
+                  ],
+                ),
                 SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
