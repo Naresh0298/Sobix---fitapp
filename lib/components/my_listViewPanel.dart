@@ -32,33 +32,31 @@ class MyListViewPanel extends StatelessWidget {
   }
 
   // Helper method to get total lift and number of PRs for a specific date
-  Future<Map<String, dynamic>> getTotalLiftAndPRs(String date) async {
+  Stream<Map<String, dynamic>> getTotalLiftAndPRsStream(String date) {
     final userId = FirebaseAuth.instance.currentUser?.uid;
-
-    if (userId == null) {
-      throw Exception("User not logged in");
-    }
+    if (userId == null) throw Exception("User not logged in");
 
     var totalLiftRef = FirebaseFirestore.instance
         .collection('users')
         .doc(userId)
         .collection('daily-progress')
-        .where('date', isEqualTo: date); // Filter by date
+        .where('date', isEqualTo: date)
+        .snapshots(); // ✅ Convert to stream
 
-    var snapshot = await totalLiftRef.get();
+    return totalLiftRef.map((snapshot) {
+      double totalLift = 0.0;
+      int prCount = 0;
 
-    double totalLift = 0.0;
-    int prCount = 0;
+      for (var doc in snapshot.docs) {
+        totalLift += doc['total-lift'] ?? 0.0;
+        prCount = doc['PR'] ?? 0;
+      }
 
-    for (var doc in snapshot.docs) {
-      totalLift += doc['total-lift'] ?? 0.0;
-      prCount = doc['PR'] ?? 0;
-    }
-
-    return {
-      'totalLift': totalLift,
-      'prCount': prCount,
-    };
+      return {
+        'totalLift': totalLift,
+        'prCount': prCount,
+      };
+    });
   }
 
   @override
@@ -104,24 +102,19 @@ class MyListViewPanel extends StatelessWidget {
 
                 // Add active date items
                 listItems.addAll(activeDates.map((date) {
-                  return FutureBuilder<Map<String, dynamic>>(
-                    future: getTotalLiftAndPRs(date),
-                    builder: (context, futureSnapshot) {
-                      if (futureSnapshot.connectionState ==
+                  return StreamBuilder<Map<String, dynamic>>(
+                    stream: getTotalLiftAndPRsStream(date), // ✅ Use stream
+                    builder: (context, streamSnapshot) {
+                      if (streamSnapshot.connectionState ==
                           ConnectionState.waiting) {
+                        return ListTile(title: Text('Loading...'));
+                      } else if (streamSnapshot.hasError) {
                         return ListTile(
-                          title: Text('Loading...'),
-                        );
-                      } else if (futureSnapshot.hasError) {
-                        return ListTile(
-                          title: Text('Error: ${futureSnapshot.error}'),
-                        );
-                      } else if (!futureSnapshot.hasData) {
-                        return ListTile(
-                          title: Text('No data available'),
-                        );
+                            title: Text('Error: ${streamSnapshot.error}'));
+                      } else if (!streamSnapshot.hasData) {
+                        return ListTile(title: Text('No data available'));
                       } else {
-                        var data = futureSnapshot.data!;
+                        var data = streamSnapshot.data!;
                         double totalLift = data['totalLift'];
                         int prCount = data['prCount'];
 
